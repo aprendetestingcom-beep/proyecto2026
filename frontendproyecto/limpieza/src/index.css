@@ -1,0 +1,123 @@
+:root {
+  --navy-950: #04121c;
+  --navy-900: #071e2f;
+  --navy-800: #0c2539;
+  --navy-700: #123a53;
+  --teal-700: #0a7f70;
+  --teal-600: #0f9c88;
+  --teal-500: #17b39c;
+  --teal-400: #4fd3be;
+  --teal-100: rgba(23, 179, 156, 0.16);
+  --teal-50: rgba(23, 179, 156, 0.08);
+  --surface: rgba(255, 255, 255, 0.035);
+  --surface-strong: #0b2438;
+  --ink: #dbe6ee;
+  --ink-strong: #f6fafc;
+  --muted: #98acbc;
+  --line: rgba(255, 255, 255, 0.09);
+  --line-strong: rgba(255, 255, 255, 0.18);
+  --bg: #071e2f;
+  --radius-lg: 22px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
+  --shadow-sm: 0 2px 12px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 26px 55px -30px rgba(0, 0, 0, 0.7);
+  --font-sans: 'Manrope', 'Segoe UI', system-ui, -apple-system, Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
+
+  font-family: var(--font-sans);
+  color: var(--ink);
+  background-color: var(--bg);
+  color-scheme: dark;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: var(--bg);
+}
+
+h1,
+h2,
+h3,
+h4,
+p,
+figure,
+blockquote,
+dl,
+dd {
+  margin: 0;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.18;
+  letter-spacing: -0.01em;
+  color: var(--ink-strong);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+img,
+svg {
+  display: block;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+section[id] {
+  scroll-margin-top: 90px;
+}
+
+::selection {
+  background: rgba(79, 211, 190, 0.28);
+  color: #fff;
+}
+
+:focus-visible {
+  outline: 2px solid var(--teal-400);
+  outline-offset: 2px;
+}
