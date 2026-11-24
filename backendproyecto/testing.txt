@@ -1,0 +1,316 @@
+==============================================================================
+PRUEBAS DE API - SISTEMA DE SERVICIOS DE LIMPIEZA DE HOTELES
+==============================================================================
+
+Proyecto        : backendproyecto
+Fecha           : 19/11/2026
+API bajo prueba : Node.js + Express 5 (CRUD de administrador, clientes,
+                  personal y servicios)
+Base de datos   : MariaDB 10.11.13 - Daniel @ cursotesting.com.ar:3306
+Ejecutor        : Node.js Test Runner (node:test), sin dependencias externas
+Resultado       : 39/39 pruebas aprobadas
+
+------------------------------------------------------------------------------
+1. ALCANCE DE LAS PRUEBAS
+------------------------------------------------------------------------------
+
+Las pruebas cubren las 4 APIs CRUD generadas en Node.js, tabla por tabla:
+
+  - administrador : /api/administrador
+  - clientes      : /api/clientes
+  - personal      : /api/personal
+  - servicios     : /api/servicios
+
+Para cada API se verifica el ciclo CRUD completo:
+
+  C -> POST   /api/{recurso}          (crear, 201)
+  R -> GET    /api/{recurso}          (listar, buscar y paginar, 200)
+  R -> GET    /api/{recurso}/:id      (obtener uno, 200)
+  U -> PUT    /api/{recurso}/:id      (reemplazo completo, 200)
+  U -> PATCH  /api/{recurso}/:id      (actualización parcial, 200)
+  D -> DELETE /api/{recurso}/:id      (borrar, 204)
+
+Además se prueban:
+
+  - Validaciones de campos obligatorios y formatos (HTTP 400).
+  - Restricciones de unicidad de la base (HTTP 409).
+  - Recursos inexistentes e identificadores inválidos (HTTP 404/400).
+  - Valores por defecto definidos en la base o en el controlador.
+  - Respuestas JSON uniformes: { data }, { data, meta } o { error }.
+  - Que el hash de la clave del administrador nunca se exponga.
+  - Que las claves se guarden hasheadas con scrypt y se puedan verificar.
+  - Búsqueda por texto (?search=), paginación (?limit= y ?offset=) y filtro
+    por hotel (?idHotel=) en personal.
+
+No se prueban: login/autenticación (la API no tiene endpoints de sesión),
+interfaz gráfica, rendimiento, concurrencia, seguridad ofensiva, ni fallas
+de infraestructura. Ver sección 6.
+
+------------------------------------------------------------------------------
+2. ARCHIVOS DE PRUEBA
+------------------------------------------------------------------------------
+
+scripts/test-administrador.js  -> 10 pruebas de la tabla administrador.
+scripts/test-clientes.js       -> 10 pruebas de la tabla clientes.
+scripts/test-personal.js       -> 10 pruebas de la tabla personal.
+scripts/test-servicios.js      ->  9 pruebas de la tabla servicios.
+scripts/test-helpers.js        -> utilidades comunes: levanta la API en un
+                                  puerto aleatorio, ejecuta peticiones HTTP,
+                                  valida códigos de estado, genera códigos
+                                  únicos y limpia los datos creados.
+
+Cada archivo es autónomo: inicia el servidor Express dentro del mismo
+proceso, usa la base configurada en .env y cierra todo al finalizar.
+
+------------------------------------------------------------------------------
+3. CÓMO EJECUTAR
+------------------------------------------------------------------------------
+
+Todas las pruebas:
+
+    npm test
+
+Una tabla en particular:
+
+    npm run test:administrador
+    npm run test:clientes
+    npm run test:personal
+    npm run test:servicios
+
+Requisito: conexión disponible a la base configurada en .env. No hace falta
+ejecutar "npm start" ni cargar datos manualmente. Al finalizar, cada script
+elimina los registros que creó.
+
+------------------------------------------------------------------------------
+4. ESTRATEGIA Y DATOS DE PRUEBA
+------------------------------------------------------------------------------
+
+- Se usa la API real contra la base real (pruebas de integración).
+- El servidor se levanta en un puerto libre (0) en 127.0.0.1.
+- Cada ejecución genera un código único (fecha en base 36 + aleatorio) que se
+  incluye en nombres, emails, usuarios y NIF. Así no se choca con los 10
+  registros de seed ni con ejecuciones anteriores.
+- Los registros se crean con IDs autoincrementales y se eliminan en un hook
+  "after", en orden inverso (primero personal, luego el hotel de apoyo).
+- Los tests de personal crean un hotel de apoyo mediante POST /api/clientes
+  para usar un idHotel válido; ese hotel también se elimina al final.
+- Los tests de administrador consultan la base directamente solo para
+  comprobar que la clave almacenada es un hash scrypt verificable.
+- Los tests se ejecutan de forma secuencial (--test-concurrency=1) para evitar
+  interferencias entre tablas y facilitar la lectura del resultado.
+
+------------------------------------------------------------------------------
+5. CASOS DE PRUEBA
+------------------------------------------------------------------------------
+
+5.1 ADMINISTRADOR - scripts/test-administrador.js
+------------------------------------------------------------------------------
+
+ADM-01  POST /api/administrador
+        Crea un administrador completo.
+        Esperado: 201; devuelve idAdministrador entero, nombre, email en
+        minúsculas, usuario y móvil; NO incluye el campo Clave.
+        Verifica en la base que Clave sea un hash scrypt y que la contraseña
+        original se pueda verificar con verifyPassword().
+
+ADM-02  GET /api/administrador?search=CODIGO&limit=5&offset=0
+        Esperado: 200; meta.limit=5, meta.offset=0, meta.total >= 1; el
+        registro creado aparece en data; ningún registro expone Clave.
+
+ADM-03  GET /api/administrador/:id
+        Esperado: 200; devuelve el registro correcto y sin Clave.
+
+ADM-04  PUT /api/administrador/:id
+        Reemplaza nombre, email, móvil, usuario y contraseña.
+        Esperado: 200; datos actualizados; la nueva clave queda hasheada y
+        verificable, y la anterior deja de verificar.
+
+ADM-05  PATCH /api/administrador/:id
+        Actualiza solo N°Móvil y luego lo envía como null.
+        Esperado: 200 en ambos casos; el email no cambia; el móvil queda
+        actualizado y luego en null.
+
+ADM-06  POST /api/administrador con email duplicado y con usuario duplicado.
+        Esperado: 409 en ambos casos, con error.code = ER_DUP_ENTRY.
+
+ADM-07  POST /api/administrador con body vacío, email inválido y clave corta.
+        Esperado: 400; en el body vacío, details.missing indica los cuatro
+        campos obligatorios.
+
+ADM-08  GET /api/administrador/0 y /api/administrador/abc
+        Esperado: 400 por identificador inválido.
+
+ADM-09  POST /api/administrador sin N°Móvil.
+        Esperado: 201; N°Móvil = null; sin Clave en la respuesta.
+
+ADM-10  DELETE /api/administrador/:id
+        Esperado: 204 al borrar; 404 al consultar después; 404 al repetir
+        el borrado.
+
+5.2 CLIENTES - scripts/test-clientes.js
+------------------------------------------------------------------------------
+
+CLI-01  POST /api/clientes
+        Crea un hotel con Nombre, Domicilio, Responsable y NIF.
+        Esperado: 201; idHotel entero y datos devueltos correctamente.
+
+CLI-02  GET /api/clientes?search=CODIGO&limit=1&offset=0
+        Esperado: 200; meta.limit=1, meta.offset=0, total >= 1; devuelve
+        exactamente 1 registro y corresponde al creado.
+
+CLI-03  GET /api/clientes/:id
+        Esperado: 200; devuelve el hotel correcto con su NIF.
+
+CLI-04  PUT /api/clientes/:id
+        Reemplaza los cuatro campos.
+        Esperado: 200; Domicilio y Responsable actualizados; Nombre y NIF
+        conservados según lo enviado.
+
+CLI-05  PATCH /api/clientes/:id
+        Actualiza solo Responsable.
+        Esperado: 200; cambia Responsable; Domicilio y NIF no cambian.
+
+CLI-06  POST /api/clientes con NIF ya existente.
+        Esperado: 409; error.code = ER_DUP_ENTRY.
+
+CLI-07  POST /api/clientes solo con Nombre.
+        Esperado: 400; details.missing = Domicilio, Responsable, NIF.
+
+CLI-08  POST /api/clientes con NIF de 21 caracteres.
+        Esperado: 400; mensaje de longitud máxima de 20 caracteres.
+
+CLI-09  GET /api/clientes/0 y /api/clientes/abc
+        Esperado: 400 por identificador inválido.
+
+CLI-10  DELETE /api/clientes/:id
+        Esperado: 204; 404 al consultar; 404 al repetir el borrado.
+
+5.3 PERSONAL - scripts/test-personal.js
+------------------------------------------------------------------------------
+
+Preparación: antes de las pruebas se crea un hotel de apoyo con
+POST /api/clientes y se guarda su idHotel para asignar empleados.
+
+PER-01  POST /api/personal
+        Crea un empleado con nombre, fecha 2025-05-15, Tarea_Cumplida=true
+        e idHotel del hotel de apoyo.
+        Esperado: 201; Tarea_Cumplida se devuelve como 1; idHotel correcto;
+        Fecha_de_Ingreso con formato YYYY-MM-DD.
+
+PER-02  POST /api/personal sin Tarea_Cumplida.
+        Esperado: 201; Tarea_Cumplida = 0 por defecto.
+
+PER-03  GET /api/personal?search=CODIGO&limit=50
+        Esperado: 200; total >= 2; aparecen el empleado principal y el
+        secundario.
+
+PER-04  GET /api/personal?idHotel=ID
+        Esperado: 200; todos los registros devueltos pertenecen al hotel
+        indicado y aparece el empleado creado.
+
+PER-05  GET /api/personal/:id
+        Esperado: 200; idPersonal e idHotel correctos.
+
+PER-06  PUT /api/personal/:id
+        Reemplaza nombre, fecha, Tarea_Cumplida=false e idHotel.
+        Esperado: 200; fecha 2025-06-01; Tarea_Cumplida = 0.
+
+PER-07  PATCH /api/personal/:id
+        Actualiza solo Tarea_Cumplida=true.
+        Esperado: 200; Tarea_Cumplida = 1; la fecha no cambia.
+
+PER-08  POST /api/personal con fecha 2025-02-30, sin idHotel y con
+        Tarea_Cumplida="tal vez".
+        Esperado: 400 en los tres casos (fecha inexistente, campo
+        obligatorio faltante, booleano inválido).
+
+PER-09  GET /api/personal/0 y /api/personal/abc
+        Esperado: 400 por identificador inválido.
+
+PER-10  DELETE /api/personal/:id
+        Esperado: 204; 404 al consultar; 404 al repetir el borrado.
+        El hotel de apoyo se elimina en la limpieza final.
+
+5.4 SERVICIOS - scripts/test-servicios.js
+------------------------------------------------------------------------------
+
+SER-01  POST /api/servicios completo
+        Descripción, productos, estadística=5 y facturación=2500.75.
+        Esperado: 201; valores devueltos correctamente; created_at presente.
+
+SER-02  POST /api/servicios solo con descripción.
+        Esperado: 201; productos_utilizar=null, estadística=0,
+        facturación=0 (valores por defecto).
+
+SER-03  GET /api/servicios?search=CODIGO&limit=1&offset=0 y offset=1
+        Esperado: 200; meta.total >= 2; una fila por página; los IDs de
+        ambas páginas son distintos y corresponden a los dos servicios
+        creados.
+
+SER-04  GET /api/servicios/:id
+        Esperado: 200; devuelve el servicio correcto.
+
+SER-05  PUT /api/servicios/:id
+        Reemplaza descripción, productos, estadística y facturación.
+        Esperado: 200; todos los valores actualizados.
+
+SER-06  PATCH /api/servicios/:id con facturacion=123.456
+        Esperado: 200; se guarda redondeado a 123.46 (DECIMAL(10,2)); la
+        descripción no cambia.
+
+SER-07  POST /api/servicios con body vacío, facturación negativa,
+        estadística negativa y estadística decimal (2.5).
+        Esperado: 400 en los cuatro casos.
+
+SER-08  GET /api/servicios/0 y /api/servicios/abc
+        Esperado: 400 por identificador inválido.
+
+SER-09  DELETE /api/servicios/:id
+        Esperado: 204; 404 al consultar; 404 al repetir el borrado.
+
+------------------------------------------------------------------------------
+6. FUERA DEL ALCANCE
+------------------------------------------------------------------------------
+
+- Autenticación y autorización: la API no implementa login, tokens ni roles;
+  solo se prueba el almacenamiento hasheado de la clave del administrador.
+- Interfaz de usuario / frontend: no existe en este repositorio.
+- Pruebas de carga, estrés, concurrencia o tiempos de respuesta.
+- Pruebas de seguridad ofensiva (fuerza bruta, XSS, CSRF, rate limiting).
+  Sí se verifica de forma indirecta el uso de consultas parametrizadas.
+- Integridad referencial real: los .sql definen claves foráneas lógicas, sin
+  FOREIGN KEY; no se prueba el rechazo de un idHotel inexistente.
+- Disponibilidad, respaldo y recuperación de la base de datos.
+- Compatibilidad con otros motores o versiones distintas de MySQL/MariaDB.
+- Envío real de correos, archivos o servicios externos.
+- Cobertura de líneas/código (no se usa herramienta de cobertura).
+
+------------------------------------------------------------------------------
+7. LIMPIEZA Y DATOS
+------------------------------------------------------------------------------
+
+- Cada script registra los IDs que crea y los elimina en el hook "after".
+- El orden de limpieza es inverso: personal -> hotel de apoyo -> clientes ->
+  servicios -> administrador según corresponda.
+- Un DELETE repetido devuelve 404 y se ignora durante la limpieza.
+- Los 10 registros de seed de cada tabla no se modifican ni se eliminan.
+- Tras ejecutar npm test, el conteo de las tablas debe seguir siendo 10 por
+  tabla (verificable con npm run db:test).
+
+------------------------------------------------------------------------------
+8. CRITERIOS DE ACEPTACIÓN
+------------------------------------------------------------------------------
+
+Se considera aprobada la etapa si:
+
+  1. Los 4 scripts finalizan sin errores.
+  2. Los 39 casos de prueba resultan aprobados.
+  3. Las respuestas respetan los códigos HTTP esperados.
+  4. Los datos creados se eliminan y no quedan registros de prueba.
+  5. La API no expone el hash de la contraseña del administrador.
+
+Resultado de la ejecución del 19/11/2026:
+
+  tests 39 | pass 39 | fail 0 | cancelled 0 | skipped 0
+
+==============================================================================

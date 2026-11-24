@@ -1,0 +1,28 @@
+{
+  "name": "backendproyecto",
+  "version": "1.0.0",
+  "description": "API REST con CRUD para el sistema de servicios de limpieza de hoteles",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "db:test": "node scripts/test-connection.js",
+    "db:seed": "node scripts/seed.js",
+    "db:migrate": "node scripts/migrate-2026-11-23.js",
+    "test": "node --test --test-concurrency=1 scripts/test-administrador.js scripts/test-clientes.js scripts/test-personal.js scripts/test-servicios.js",
+    "test:administrador": "node --test scripts/test-administrador.js",
+    "test:clientes": "node --test scripts/test-clientes.js",
+    "test:personal": "node --test scripts/test-personal.js",
+    "test:servicios": "node --test scripts/test-servicios.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.10",
+    "express": "^5.3.0",
+    "mysql2": "^3.24.6"
+  }
+}
